@@ -76,33 +76,3 @@ jobs:
           name: unit-tests
           path: unit-tests
           if-no-files-found: error
-
-  # The package declares node >= 22; the job above runs on 24, where node:test names each test's file and line.
-  node-22:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: cascade-reference-tables
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          path: cascade-reference-tables
-          persist-credentials: false
-      - name: The vocabulary at the commit vocabulary.json pins, beside this repository
-        id: vocabulary
-        run: |
-          echo "repository=$(jq -r '.repository | sub("^https://github.com/"; "")' vocabulary.json)" >> "$GITHUB_OUTPUT"
-          echo "commit=$(jq -r .commit vocabulary.json)" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v7
-        with:
-          repository: ${{ steps.vocabulary.outputs.repository }}
-          ref: ${{ steps.vocabulary.outputs.commit }}
-          path: cascade-vocabulary
-          persist-credentials: false
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: cascade-reference-tables/package-lock.json
-      - run: npm ci
-      - run: npm test

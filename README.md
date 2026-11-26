@@ -51,7 +51,7 @@ This is not legal advice; the [licence reading](https://github.com/the-cascade-p
 
 ## The host
 
-On Node 22:
+On Node 24:
 
 ```sh
 npm ci
