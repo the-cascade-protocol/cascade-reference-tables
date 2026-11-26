@@ -9,7 +9,7 @@ Report a security problem privately, by email to contact@cascadeprotocol.org, ne
 
 ## Set up
 
-You need Node.js 22 or newer and git.
+You need Node.js 24 or newer and git.
 
 ```sh
 git clone git@github.com:<you>/cascade-reference-tables.git
@@ -37,14 +37,13 @@ npm test
 
 CI also checks that the tests read as a specification: each test's group is a heading listed in
 [`host/test/spec.json`](host/test/spec.json), word for word. That check runs in CI, not in the test command, so a new or
-renamed group needs its heading added there by hand. CI runs the tests on Node 24 and again on Node 22.
+renamed group needs its heading added there by hand. CI runs the tests on Node 24.
 
 ## What a pull request must pass
 
 CI runs on every pull request, and a red check is a reason not to merge.
 
 - **`check`**: type-check, lint, the tests, and the tests-read-as-a-specification check, as in "Run the checks".
-- **`node-22`**: the tests on the oldest Node the package supports.
 - **`pack`**: packs the package, which is what another repository's pull request depends on. (`release` is in the same
   workflow but runs only off pull requests.)
 
