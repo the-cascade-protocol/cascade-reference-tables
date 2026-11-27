@@ -54,7 +54,6 @@ function page(feed: Feed, vocabulary: Vocabulary, repository: string): string {
       const licence = graph.value(series, `${DCT}license`)!;
       return `<li id="${html(series)}"><strong>${html(label)}</strong>: ${table}; ${link(publisher, "publisher")}, ${link(licence, "licence")}</li>`;
     });
-  const [owner] = repository.split("/");
   return `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -62,7 +61,7 @@ function page(feed: Feed, vocabulary: Vocabulary, repository: string): string {
 <title>Cascade reference tables (DRAFT)</title>
 <h1>Cascade reference tables</h1>
 <p><strong>DRAFT: no compatibility is promised before a numbered v1.</strong></p>
-<p>Part of ${link(`https://${owner!.toLowerCase()}.github.io/cascade-runtime-js/`, "the Cascade hub")}. The code, the builders and the issues are in ${link(`https://github.com/${repository}`, repository)}.</p>
+<p>Part of ${link("https://reference.cascadeprotocol.org/", "the Cascade hub")}. The code, the builders and the issues are in ${link(`https://github.com/${repository}`, repository)}.</p>
 <p>A reference table is a list of coded rows, such as what each code means or which codes are retired, built from one publisher's release. Apps read the tables through the feed: ${link("feed.ttl", "feed.ttl")}, a DCAT catalog of every table and its versions. ${link("checked.json", "checked.json")} says when each source was last checked.</p>
 <ul>
 ${items.join("\n")}

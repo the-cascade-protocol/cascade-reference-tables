@@ -17,10 +17,10 @@ Table kinds and their rows are [cascade-vocabulary](https://github.com/the-casca
 
 ## Docs
 
-- [The Cascade hub](https://the-cascade-protocol.github.io/cascade-runtime-js/): where to go for each thing, and every repository.
+- [The Cascade hub](https://reference.cascadeprotocol.org/): where to go for each thing, and every repository.
 - [This repository's site](https://the-cascade-protocol.github.io/cascade-reference-tables/): the tables and the feed this repository publishes.
-- [Terms](https://the-cascade-protocol.github.io/cascade-runtime-js/terms/): the terms the tables' codes are read with.
-- [Unit-test report](https://the-cascade-protocol.github.io/cascade-runtime-js/conformance/tests/cascade-reference-tables/): each case of the host's tests, with its result, from the newest run on main.
+- [Terms](https://reference.cascadeprotocol.org/terms/): the terms the tables' codes are read with.
+- [Unit-test report](https://reference.cascadeprotocol.org/conformance/tests/cascade-reference-tables/): each case of the host's tests, with its result, from the newest run on main.
 
 ## What the public feed cannot hold
 

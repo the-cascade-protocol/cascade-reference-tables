@@ -1416,7 +1416,7 @@ const steps = new Steps<World>()
   .define("the site's page links the hub and this repository", (world) => {
     const page = pageOf(world);
     assert.ok(
-      page.includes('href="https://example-org.github.io/cascade-runtime-js/"'),
+      page.includes('href="https://reference.cascadeprotocol.org/"'),
       "no link to the hub",
     );
     assert.ok(
