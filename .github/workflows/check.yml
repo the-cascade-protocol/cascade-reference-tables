@@ -103,6 +103,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          [ -n "$COMMIT" ] || { echo "::error::check gave no vocabulary commit"; exit 1; }
           jq -n --arg commit "$COMMIT" --arg how "$HOW" \
             '{repository: "https://github.com/the-cascade-protocol/cascade-vocabulary", commit: $commit, how: $how}' \
             > vocabulary.json

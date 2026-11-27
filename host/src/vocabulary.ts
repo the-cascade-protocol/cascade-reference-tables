@@ -62,19 +62,33 @@ export async function resolveVocabulary(
   const record = join(root, "vocabulary.json");
   if (existsSync(record)) {
     const recorded = JSON.parse(await readFile(record, "utf8")) as Recorded;
+    if (
+      typeof recorded.repository !== "string" ||
+      !/^[0-9a-f]{40}$/.test(String(recorded.commit))
+    )
+      throw new Error(`${record} names no repository and commit`);
     return {
       folder: await fetched(root, recorded.repository, recorded.commit),
       said: `cascade-vocabulary: ${recorded.commit.slice(0, 12)}, which this build was tested with${recorded.how === undefined ? "" : ` (${recorded.how})`}`,
     };
   }
-  const head = (await run("git", ["ls-remote", repository, "HEAD"])).stdout
+  const beside = `check it out beside this repository as ${SIBLING} to read it with no network`;
+  const head = (
+    await run("git", ["ls-remote", repository, "HEAD"]).catch(
+      (error: unknown) => {
+        throw new Error(`${repository} could not be read; ${beside}`, {
+          cause: error,
+        });
+      },
+    )
+  ).stdout
     .trim()
     .split(/\s/)[0];
   if (head === undefined || head === "")
-    throw new Error(`${repository} has no default branch`);
+    throw new Error(`${repository} has no default branch; ${beside}`);
   return {
     folder: await fetched(root, repository, head),
-    said: `cascade-vocabulary: ${head.slice(0, 12)}, the head of its default branch; check it out beside this repository as ${SIBLING} to read it with no network`,
+    said: `cascade-vocabulary: ${head.slice(0, 12)}, the head of its default branch; ${beside}`,
   };
 }
 
