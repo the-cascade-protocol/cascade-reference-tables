@@ -19,6 +19,7 @@ import {
   sourceFolder,
 } from "./source.js";
 import { folderStore, releaseStore } from "./stores.js";
+import { recordVocabulary } from "./vocabulary.js";
 
 const USAGE = `host check <source> [--feed <file>] [--checked <file>]
 host build <source> [--release <folder> --label <text>] [--out <folder>] [--feed <file>] [--releases <owner/repo>] [--checked <file>]
@@ -98,6 +99,7 @@ async function buildCommand(root: string, args: string[]): Promise<number> {
   }
   const contract = await readContract(root);
   console.error(contract.said);
+  await recordVocabulary(resolve(values.out), contract);
   const folder = sourceFolder(root, name);
   const source = await readSource(folder);
   const seen = await seenBy(values.checked, source);

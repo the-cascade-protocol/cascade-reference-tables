@@ -12,8 +12,8 @@ follow, the host, the builders of the open sources, and the feed apps read. The 
 | a host                   | [`shapes/`](shapes/) and [`rules/`](rules/)                                            |
 | an app that reads tables | [`feed/`](feed/), with [`fixtures/feeds/valid/`](fixtures/feeds/valid/) as a test feed |
 
-Table kinds and their rows are [cascade-vocabulary](https://github.com/the-cascade-protocol/cascade-vocabulary)'s, at the commit
-[`vocabulary.json`](vocabulary.json) pins.
+Table kinds and their rows are [cascade-vocabulary](https://github.com/the-cascade-protocol/cascade-vocabulary)'s, at its
+newest main; a package build names the commit it was tested with in its `vocabulary.json`.
 
 ## Docs
 
@@ -69,11 +69,12 @@ detected by a dated address, the file of the month after the newest version's, l
 detected by its announcement is never downloaded: `build` without `--release` writes `<out>/announced.json` when its
 public page names a newer version, and a person builds it with `--release <folder> --label <version>` from a release
 they unzipped outside every repository. `--checked` reads what the last check saw from a `checked.json`. The host reads the vocabulary from
-`$CASCADE_VOCABULARY`, else the sibling checkout `../cascade-vocabulary`, else the pinned commit, fetched into
-`.cache/`.
+`$CASCADE_VOCABULARY`, else the sibling checkout `../cascade-vocabulary`, else the commit a package build's
+`vocabulary.json` names, else the head of its default branch, each commit fetched into `.cache/`.
 
-A Node program uses the host as a package, depending on a commit:
-`npm install --save-exact github:the-cascade-protocol/cascade-reference-tables#<commit>`. It imports `readContract`,
+A Node program uses the host as a package, installing a build of a commit of main:
+`npm install --save-exact https://github.com/the-cascade-protocol/cascade-reference-tables/releases/download/package-builds/cascade-reference-tables-0.0.0-commit-<commit>.tgz`.
+It imports `readContract`,
 `readSource`, `sourceFolder`, `loadBuild` and `buildLatest` from `cascade-reference-tables`, and passes
 `readContract` the vocabulary folder it uses. A builder outside this repository imports from
 `cascade-reference-tables/builder` and is loaded from the compiled `build.js` it provides beside its

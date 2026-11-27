@@ -17,10 +17,12 @@ cd cascade-reference-tables
 npm ci
 ```
 
-`npm ci` also compiles the TypeScript. Table kinds come from [cascade-vocabulary](https://github.com/the-cascade-protocol/cascade-vocabulary)
-at the commit [`vocabulary.json`](vocabulary.json) pins. The host reads it from `$CASCADE_VOCABULARY`, else from a
-checkout beside this repository named `cascade-vocabulary` (which is what CI does), else fetches the pinned commit into
-`.cache/`. Clone it beside this repository to work offline.
+`npm ci` also compiles the TypeScript. Table kinds come from [cascade-vocabulary](https://github.com/the-cascade-protocol/cascade-vocabulary).
+The host reads it from `$CASCADE_VOCABULARY`, else from a checkout beside this repository named `cascade-vocabulary`, as
+it is on disk, else fetches the head of its default branch into `.cache/`. Clone it beside this repository to work
+offline. With no checkout beside it, two builds of one commit a day apart can read different vocabulary heads, so a
+`build` in that mode writes the commit it read to `<out>/vocabulary.json` (as a package build does); offline, the host
+uses the newest vocabulary already in `.cache/` and says it could not check for a newer one.
 
 ## Run the checks
 
@@ -41,9 +43,10 @@ Name a test to read as behaviour; nothing checks the grammar of a name. CI runs 
 
 CI runs on every pull request, and a red check is a reason not to merge.
 
-- **`check`**: type-check, lint and the tests, as in "Run the checks".
-- **`pack`**: packs the package, which is what another repository's pull request depends on. (`release` is in the same
-  workflow but runs only off pull requests.)
+- **`check`**: type-check, lint and the tests, as in "Run the checks", against the vocabulary's newest main.
+- **`pack`**: packs the package once `check` passes, which is what another repository's pull request depends on. It
+  writes into the package a `vocabulary.json` naming the vocabulary commit `check` ran with. (`release`, in the same
+  workflow, runs only off pull requests.)
 
 [`CLAUDE.md`](CLAUDE.md) holds the order a requirement is put in, so that a program can check it, and what a change to
 `vocab/`, `shapes/`, `rules/` or `builder/` must say in its commit message.
@@ -57,9 +60,16 @@ the sentence says. The contract rules (what a published version, a builder and a
 
 ## A change that spans two repositories
 
-This repository pins another to a commit, in [`vocabulary.json`](vocabulary.json), and to no branch. A change to the table kinds is made in cascade-vocabulary first, and
-this repository then moves the commit in [`vocabulary.json`](vocabulary.json). Say in the pull request description what
-the change needs from the other repository, with its full URL.
+Nothing here pins cascade-vocabulary: CI reads its newest main, or the open pull request a line
+`Depends-On: https://github.com/the-cascade-protocol/cascade-vocabulary/pull/<N>` in this pull request's description
+names, merged into main. A change both need is a pair of pull requests, each naming the other on that line.
+
+A hand-started release of an older commit is tested against today's vocabulary main, so an older commit that no longer
+passes with it cannot be released: a release records the vocabulary it passed with.
+
+A vocabulary pull request checks the tables' rows against its own row shapes by running `npm test` in a checkout of this
+repository, after `npm ci`, with the vocabulary under test checked out beside it as `cascade-vocabulary` or named by
+`$CASCADE_VOCABULARY`.
 
 ## Licence
 

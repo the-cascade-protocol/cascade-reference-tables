@@ -33,6 +33,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: The vocabulary at its newest main, beside this repository
+        id: vocabulary
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
+        with:
+          repository: the-cascade-protocol/cascade-vocabulary
+          checkout: ../cascade-vocabulary
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
@@ -61,6 +67,14 @@ jobs:
         run: |
           npm run --silent host -- publish --site build/site --repository "$GITHUB_REPOSITORY" --releases "$GITHUB_REPOSITORY" \
             build/live-checked.json $(find build/checked -name checked.json)
+      - name: The vocabulary the site was made with, recorded in it
+        env:
+          COMMIT: ${{ steps.vocabulary.outputs.commit }}
+          HOW: ${{ steps.vocabulary.outputs.how }}
+        run: |
+          jq -n --arg commit "$COMMIT" --arg how "$HOW" \
+            '{repository: "https://github.com/the-cascade-protocol/cascade-vocabulary", commit: $commit, how: $how}' \
+            > build/site/vocabulary.json
       - id: rows
         run: echo "any=$(find build/site/rows -name '*.nq.gz' | head -1)" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@v3

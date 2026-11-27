@@ -41,7 +41,7 @@ import { keyed, RowSchema, SeriesRows, toRdf } from "./rows.js";
 import { Shapes } from "./shapes.js";
 import { folderStore, type RowsStore } from "./stores.js";
 import { matches, type Source, type SourceSeries } from "./source.js";
-import { resolveVocabulary, Vocabulary } from "./vocabulary.js";
+import { type Recorded, resolveVocabulary, Vocabulary } from "./vocabulary.js";
 
 /** Rows checked by one validator: one validator over every row costs more than linearly. */
 const SHAPE_CHUNK = 2000;
@@ -61,6 +61,8 @@ export interface Contract {
   readonly schema: RowSchema;
   /** Where the vocabulary was read from. */
   readonly said: string;
+  /** The commit it was read at, when the host fetched it rather than being given a folder. */
+  readonly recorded?: Recorded;
 }
 
 /** What the feed's shapes and the vocabulary's find wrong with the feed, each retired series and its versions left out. */
@@ -116,6 +118,7 @@ export async function readContract(
     ),
     schema: new RowSchema(join(root, "builder", "interface.schema.json")),
     said: resolved.said,
+    ...(resolved.recorded === undefined ? {} : { recorded: resolved.recorded }),
   };
 }
 

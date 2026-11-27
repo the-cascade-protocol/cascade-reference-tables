@@ -1,7 +1,16 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   Graph,
@@ -19,72 +28,177 @@ const run = promisify(execFile);
 const TERMS = "ontologies/cascade.ttl";
 const SHAPES = "ontologies/cascade.shapes.ttl";
 
-export interface Pin {
+const REPOSITORY = "https://github.com/the-cascade-protocol/cascade-vocabulary";
+const SIBLING = "cascade-vocabulary";
+
+/** What a published build records, in its `vocabulary.json`, of the vocabulary it was tested with. */
+export interface Recorded {
   readonly repository: string;
   readonly commit: string;
+  readonly how?: string;
 }
 
 /** The folder the vocabulary is read from, and how it was found. */
 export interface Resolved {
   readonly folder: string;
   readonly said: string;
+  readonly recorded?: Recorded;
 }
 
+/** `.cache/` can sit past Windows' path limit, which git honours only when told. */
 async function git(folder: string, ...args: string[]): Promise<string> {
-  return (await run("git", ["-C", folder, ...args])).stdout.trim();
+  return (
+    await run("git", ["-C", folder, "-c", "core.longpaths=true", ...args])
+  ).stdout.trim();
 }
 
 /**
  * The vocabulary's folder, first match wins: `CASCADE_VOCABULARY`; the sibling checkout `../cascade-vocabulary`; the
- * commit `vocabulary.json` pins, fetched once into `.cache/`.
+ * commit a published build's `vocabulary.json` records; the head of the vocabulary's default branch. A commit is
+ * fetched once into `.cache/`.
  */
-export async function resolveVocabulary(root: string): Promise<Resolved> {
-  const pin = JSON.parse(
-    await readFile(join(root, "vocabulary.json"), "utf8"),
-  ) as Pin;
+export async function resolveVocabulary(
+  root: string,
+  repository = REPOSITORY,
+): Promise<Resolved> {
   const named = process.env.CASCADE_VOCABULARY;
   if (named !== undefined && named !== "")
     return { folder: resolve(named), said: `cascade-vocabulary: ${named}` };
-  const sibling = join(dirname(resolve(root)), basename(pin.repository));
+  const sibling = join(dirname(resolve(root)), SIBLING);
   if (existsSync(join(sibling, TERMS))) {
     const commit = await git(sibling, "rev-parse", "HEAD").catch(() => "");
     return {
       folder: sibling,
-      said: `cascade-vocabulary: the sibling checkout ${sibling}${commit === "" ? "" : ` at ${commit.slice(0, 12)}`}, not the pinned ${pin.commit.slice(0, 12)}`,
+      said: `cascade-vocabulary: the sibling checkout ${sibling}${commit === "" ? "" : ` at ${commit.slice(0, 12)}`}`,
     };
   }
-  const folder = join(root, ".cache", "cascade-vocabulary", pin.commit);
+  const record = join(root, "vocabulary.json");
+  if (existsSync(record)) {
+    const recorded = JSON.parse(await readFile(record, "utf8")) as Recorded;
+    if (
+      typeof recorded.repository !== "string" ||
+      !/^[0-9a-f]{40}$/.test(String(recorded.commit))
+    )
+      throw new Error(`${record} names no repository and commit`);
+    if (recorded.repository !== repository)
+      throw new Error(
+        `${record} names ${recorded.repository}, not ${repository}; refusing to fetch from it`,
+      );
+    const how = recorded.how === undefined ? "" : ` (${recorded.how})`;
+    const folder = await fetched(root, repository, recorded.commit).catch(
+      (error: unknown) => {
+        throw new Error(
+          `${record} names commit ${recorded.commit} of ${repository}${how}, which could not be fetched; ` +
+            `check the vocabulary out beside this repository as ${SIBLING}, or name it by $CASCADE_VOCABULARY`,
+          { cause: error },
+        );
+      },
+    );
+    return {
+      folder,
+      said: `cascade-vocabulary: ${recorded.commit.slice(0, 12)} of ${repository}, which this build was tested with${how}`,
+      recorded,
+    };
+  }
+  const beside = `check it out beside this repository as ${SIBLING} to read it with no network`;
+  const listed = await run("git", ["ls-remote", repository, "HEAD"]).catch(
+    (error: unknown) => error as Error,
+  );
+  if (listed instanceof Error) {
+    const cached = await newestCached(root);
+    if (cached === undefined)
+      throw new Error(`${repository} could not be read; ${beside}`, {
+        cause: listed,
+      });
+    const how = "the newest it had fetched; could not check for a newer one";
+    return {
+      folder: cached.folder,
+      said: `cascade-vocabulary: ${cached.commit.slice(0, 12)} of ${repository}, ${how}`,
+      recorded: { repository, commit: cached.commit, how },
+    };
+  }
+  const head = listed.stdout.trim().split(/\s/)[0];
+  if (head === undefined || head === "")
+    throw new Error(`${repository} has no default branch; ${beside}`);
+  const how = "the head of its default branch";
+  return {
+    folder: await fetched(root, repository, head),
+    said: `cascade-vocabulary: ${head.slice(0, 12)} of ${repository}, ${how}; ${beside}`,
+    recorded: { repository, commit: head, how },
+  };
+}
+
+/** The most recently fetched vocabulary in `.cache/`, for a run that cannot reach the repository. */
+async function newestCached(
+  root: string,
+): Promise<{ folder: string; commit: string } | undefined> {
+  const cache = join(root, ".cache", "cascade-vocabulary");
+  if (!existsSync(cache)) return undefined;
+  const found: { folder: string; commit: string; at: number }[] = [];
+  for (const entry of await readdir(cache)) {
+    const folder = join(cache, entry);
+    if (/^[0-9a-f]{40}$/.test(entry) && existsSync(join(folder, TERMS)))
+      found.push({ folder, commit: entry, at: (await stat(folder)).mtimeMs });
+  }
+  return found.sort((a, b) => b.at - a.at)[0];
+}
+
+/**
+ * Writes what a local run read of the vocabulary, as a package build's `vocabulary.json` does, beside what the run
+ * builds; nothing when the vocabulary was named or checked out beside, which have no commit to say.
+ */
+export async function recordVocabulary(
+  out: string,
+  resolved: { readonly recorded?: Recorded },
+): Promise<void> {
+  if (resolved.recorded === undefined) return;
+  await mkdir(out, { recursive: true });
+  await writeFile(
+    join(out, "vocabulary.json"),
+    `${JSON.stringify(resolved.recorded, null, 2)}\n`,
+  );
+}
+
+/** The vocabulary's files at a commit, fetched once into `.cache/`. */
+async function fetched(
+  root: string,
+  repository: string,
+  commit: string,
+): Promise<string> {
+  const folder = join(root, ".cache", "cascade-vocabulary", commit);
   if (!existsSync(join(folder, TERMS))) {
     await mkdir(dirname(folder), { recursive: true });
     const partial = await mkdtemp(`${folder}.partial-`);
-    await git(partial, "init", "--quiet");
-    await git(
-      partial,
-      "fetch",
-      "--quiet",
-      "--depth",
-      "1",
-      pin.repository,
-      pin.commit,
-    );
-    await git(
-      partial,
-      "-c",
-      "advice.detachedHead=false",
-      "checkout",
-      "--quiet",
-      "FETCH_HEAD",
-    );
+    try {
+      await git(partial, "init", "--quiet");
+      await git(
+        partial,
+        "fetch",
+        "--quiet",
+        "--depth",
+        "1",
+        repository,
+        commit,
+      );
+      await git(
+        partial,
+        "-c",
+        "advice.detachedHead=false",
+        "checkout",
+        "--quiet",
+        "FETCH_HEAD",
+      );
+    } catch (error) {
+      await rm(partial, { recursive: true, force: true });
+      throw error;
+    }
     // Another run fetching the same commit may have put it in place first.
     await rename(partial, folder).catch(async (error: unknown) => {
       if (!existsSync(join(folder, TERMS))) throw error;
       await rm(partial, { recursive: true, force: true });
     });
   }
-  return {
-    folder,
-    said: `cascade-vocabulary: the pinned ${pin.commit.slice(0, 12)}`,
-  };
+  return folder;
 }
 
 /** A table kind as the vocabulary states it. */
