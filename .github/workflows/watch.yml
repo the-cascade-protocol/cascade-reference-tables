@@ -31,17 +31,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: cascade-reference-tables
-      - name: The vocabulary at the commit vocabulary.json pins, beside this repository
+      - name: The vocabulary at its newest main, or the pull request a Depends-On line names, beside this repository
         id: vocabulary
-        run: |
-          echo "repository=$(jq -r '.repository | sub("^https://github.com/"; "")' vocabulary.json)" >> "$GITHUB_OUTPUT"
-          echo "commit=$(jq -r .commit vocabulary.json)" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v7
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
         with:
-          repository: ${{ steps.vocabulary.outputs.repository }}
-          ref: ${{ steps.vocabulary.outputs.commit }}
-          path: cascade-vocabulary
-          persist-credentials: false
+          repository: the-cascade-protocol/cascade-vocabulary
+          checkout: cascade-vocabulary
       - uses: actions/setup-node@v5
         with:
           node-version: "24"
@@ -113,12 +108,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BUILT: ${{ steps.build.outputs.built }}
           BASE: ${{ github.ref_name }}
+          VOCABULARY: ${{ steps.vocabulary.outputs.commit }}
+          VOCABULARY_HOW: ${{ steps.vocabulary.outputs.how }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for name in $BUILT; do
             out="build/$name"
+            printf '\nBuilt and checked with cascade-vocabulary %s (%s).\n' "$VOCABULARY" "$VOCABULARY_HOW" >> "$out/differences.md"
             tag=$(jq -r .tag "$out/release.json")
             if [ "$BASE" = "main" ]; then
               if ! gh release view "$tag" >/dev/null 2>&1; then

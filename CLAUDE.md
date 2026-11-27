@@ -24,7 +24,7 @@ So:
 
 - **Standards, not inventions.** A source, a series and a version are DCAT, DCTERMS, PROV and SPDX. A new term goes
   in `vocab/tables.ttl`, and only where none of those has one.
-- **Table kinds are cascade-vocabulary's**, pinned in `vocabulary.json`. Nothing here defines what a row means.
+- **Table kinds are cascade-vocabulary's**, at its newest main. Nothing here defines what a row means.
 - **A builder knows its source and nothing else.** It never touches the network, a file it was not handed, or a
   pod. The host detects, downloads, checks, names and publishes.
 - **A source's declaration is RDF** (`source.ttl`), checked by `shapes/source.shapes.ttl`. Its code is only the
