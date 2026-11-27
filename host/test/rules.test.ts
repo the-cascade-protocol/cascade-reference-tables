@@ -442,8 +442,8 @@ const steps = new Steps<World>()
       ] as const) {
         const path = join(folder, records, file);
         const text = await readFile(path, "utf8");
-        assert.equal(text.split(from).length, 2, `${file} lacks ${from}`);
-        await writeFile(path, text.replace(from, to));
+        assert.ok(text.includes(from), `${file} lacks ${from}`);
+        await writeFile(path, text.replaceAll(from, to));
       }
       world.moved = await readContract(ROOT, folder);
     },
