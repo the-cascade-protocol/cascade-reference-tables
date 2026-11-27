@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   Graph,
@@ -19,9 +19,14 @@ const run = promisify(execFile);
 const TERMS = "ontologies/cascade.ttl";
 const SHAPES = "ontologies/cascade.shapes.ttl";
 
-export interface Pin {
+const REPOSITORY = "https://github.com/the-cascade-protocol/cascade-vocabulary";
+const SIBLING = "cascade-vocabulary";
+
+/** What a published build records, in its `vocabulary.json`, of the vocabulary it was tested with. */
+export interface Recorded {
   readonly repository: string;
   readonly commit: string;
+  readonly how?: string;
 }
 
 /** The folder the vocabulary is read from, and how it was found. */
@@ -36,37 +41,55 @@ async function git(folder: string, ...args: string[]): Promise<string> {
 
 /**
  * The vocabulary's folder, first match wins: `CASCADE_VOCABULARY`; the sibling checkout `../cascade-vocabulary`; the
- * commit `vocabulary.json` pins, fetched once into `.cache/`.
+ * commit a published build's `vocabulary.json` records; the head of the vocabulary's default branch. A commit is
+ * fetched once into `.cache/`.
  */
-export async function resolveVocabulary(root: string): Promise<Resolved> {
-  const pin = JSON.parse(
-    await readFile(join(root, "vocabulary.json"), "utf8"),
-  ) as Pin;
+export async function resolveVocabulary(
+  root: string,
+  repository = REPOSITORY,
+): Promise<Resolved> {
   const named = process.env.CASCADE_VOCABULARY;
   if (named !== undefined && named !== "")
     return { folder: resolve(named), said: `cascade-vocabulary: ${named}` };
-  const sibling = join(dirname(resolve(root)), basename(pin.repository));
+  const sibling = join(dirname(resolve(root)), SIBLING);
   if (existsSync(join(sibling, TERMS))) {
     const commit = await git(sibling, "rev-parse", "HEAD").catch(() => "");
     return {
       folder: sibling,
-      said: `cascade-vocabulary: the sibling checkout ${sibling}${commit === "" ? "" : ` at ${commit.slice(0, 12)}`}, not the pinned ${pin.commit.slice(0, 12)}`,
+      said: `cascade-vocabulary: the sibling checkout ${sibling}${commit === "" ? "" : ` at ${commit.slice(0, 12)}`}`,
     };
   }
-  const folder = join(root, ".cache", "cascade-vocabulary", pin.commit);
+  const record = join(root, "vocabulary.json");
+  if (existsSync(record)) {
+    const recorded = JSON.parse(await readFile(record, "utf8")) as Recorded;
+    return {
+      folder: await fetched(root, recorded.repository, recorded.commit),
+      said: `cascade-vocabulary: ${recorded.commit.slice(0, 12)}, which this build was tested with${recorded.how === undefined ? "" : ` (${recorded.how})`}`,
+    };
+  }
+  const head = (await run("git", ["ls-remote", repository, "HEAD"])).stdout
+    .trim()
+    .split(/\s/)[0];
+  if (head === undefined || head === "")
+    throw new Error(`${repository} has no default branch`);
+  return {
+    folder: await fetched(root, repository, head),
+    said: `cascade-vocabulary: ${head.slice(0, 12)}, the head of its default branch; check it out beside this repository as ${SIBLING} to read it with no network`,
+  };
+}
+
+/** The vocabulary's files at a commit, fetched once into `.cache/`. */
+async function fetched(
+  root: string,
+  repository: string,
+  commit: string,
+): Promise<string> {
+  const folder = join(root, ".cache", "cascade-vocabulary", commit);
   if (!existsSync(join(folder, TERMS))) {
     await mkdir(dirname(folder), { recursive: true });
     const partial = await mkdtemp(`${folder}.partial-`);
     await git(partial, "init", "--quiet");
-    await git(
-      partial,
-      "fetch",
-      "--quiet",
-      "--depth",
-      "1",
-      pin.repository,
-      pin.commit,
-    );
+    await git(partial, "fetch", "--quiet", "--depth", "1", repository, commit);
     await git(
       partial,
       "-c",
@@ -81,10 +104,7 @@ export async function resolveVocabulary(root: string): Promise<Resolved> {
       await rm(partial, { recursive: true, force: true });
     });
   }
-  return {
-    folder,
-    said: `cascade-vocabulary: the pinned ${pin.commit.slice(0, 12)}`,
-  };
+  return folder;
 }
 
 /** A table kind as the vocabulary states it. */
