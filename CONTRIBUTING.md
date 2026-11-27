@@ -20,7 +20,9 @@ npm ci
 `npm ci` also compiles the TypeScript. Table kinds come from [cascade-vocabulary](https://github.com/the-cascade-protocol/cascade-vocabulary).
 The host reads it from `$CASCADE_VOCABULARY`, else from a checkout beside this repository named `cascade-vocabulary`, as
 it is on disk, else fetches the head of its default branch into `.cache/`. Clone it beside this repository to work
-offline.
+offline. With no checkout beside it, two builds of one commit a day apart can read different vocabulary heads, so a
+`build` in that mode writes the commit it read to `<out>/vocabulary.json` (as a package build does); offline, the host
+uses the newest vocabulary already in `.cache/` and says it could not check for a newer one.
 
 ## Run the checks
 
@@ -61,6 +63,9 @@ the sentence says. The contract rules (what a published version, a builder and a
 Nothing here pins cascade-vocabulary: CI reads its newest main, or the open pull request a line
 `Depends-On: https://github.com/the-cascade-protocol/cascade-vocabulary/pull/<N>` in this pull request's description
 names, merged into main. A change both need is a pair of pull requests, each naming the other on that line.
+
+A hand-started release of an older commit is tested against today's vocabulary main, so an older commit that no longer
+passes with it cannot be released: a release records the vocabulary it passed with.
 
 A vocabulary pull request checks the tables' rows against its own row shapes by running `npm test` in a checkout of this
 repository, after `npm ci`, with the vocabulary under test checked out beside it as `cascade-vocabulary` or named by
