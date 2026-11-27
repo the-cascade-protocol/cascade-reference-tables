@@ -90,6 +90,20 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
     });
   });
 
+  describe("given a record whose commit is not a commit", () => {
+    it("refuses it, naming the record", async () => {
+      const folder = await root("malformed");
+      await writeFile(
+        join(folder, "vocabulary.json"),
+        JSON.stringify({ repository, commit: "../../elsewhere" }),
+      );
+      await assert.rejects(
+        resolveVocabulary(folder, repository),
+        /vocabulary\.json names no repository and commit/,
+      );
+    });
+  });
+
   describe("given a checkout with no vocabulary beside it and no record", () => {
     it("reads the head of the vocabulary's default branch", async () => {
       const found = await resolveVocabulary(await root("newest"), repository);
@@ -99,6 +113,16 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
         new RegExp(
           `${commits.newer.slice(0, 12)}, the head of its default branch`,
         ),
+      );
+    });
+
+    it("says to check the vocabulary out beside it when its repository cannot be read", async () => {
+      await assert.rejects(
+        resolveVocabulary(
+          await root("unreadable"),
+          join(scratch, "no-such-repository"),
+        ),
+        /check it out beside this repository as cascade-vocabulary/,
       );
     });
   });
