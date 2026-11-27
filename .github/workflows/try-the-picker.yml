@@ -48,7 +48,7 @@ jobs:
         uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
         with:
           repository: the-cascade-protocol/cascade-sandbox
-          package: '*.tgz'
+          package: "*.tgz"
       - name: the tables' package
         id: tables
         uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
