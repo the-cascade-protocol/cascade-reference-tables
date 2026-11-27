@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -12,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { promisify } from "node:util";
-import { resolveVocabulary } from "../src/vocabulary.js";
+import { recordVocabulary, resolveVocabulary } from "../src/vocabulary.js";
 
 const run = promisify(execFile);
 const TERMS = join("ontologies", "cascade.ttl");
@@ -110,6 +111,50 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
     });
   });
 
+  describe("given a record naming a repository other than the vocabulary's", () => {
+    for (const [what, other] of [
+      ["another repository", "https://example.invalid/someone/else"],
+      ["a local path", join(tmpdir(), "somewhere", "cascade-vocabulary")],
+      ["a url", "http://127.0.0.1:1/cascade-vocabulary.git"],
+    ] as const)
+      it(`refuses ${what}, naming it, and fetches nothing`, async () => {
+        const folder = await root(`other-${what.replace(/ /g, "-")}`);
+        await writeFile(
+          join(folder, "vocabulary.json"),
+          JSON.stringify({ repository: other, commit: commits.older }),
+        );
+        await assert.rejects(
+          resolveVocabulary(folder, repository),
+          (error: Error) =>
+            error.message.includes(other) &&
+            /vocabulary\.json names/.test(error.message),
+        );
+        assert.equal(existsSync(join(folder, ".cache")), false);
+      });
+  });
+
+  describe("given a record whose commit its repository cannot give", () => {
+    it("says what the record is and to put the vocabulary beside or name it by CASCADE_VOCABULARY", async () => {
+      const folder = await root("cannot-give");
+      await writeFile(
+        join(folder, "vocabulary.json"),
+        JSON.stringify({
+          repository,
+          commit: "0".repeat(40),
+          how: "pull request 7 merged into main",
+        }),
+      );
+      await assert.rejects(
+        resolveVocabulary(folder, repository),
+        (error: Error) =>
+          error.message.includes("0".repeat(40)) &&
+          error.message.includes("pull request 7 merged into main") &&
+          /beside it/.test(error.message) &&
+          /CASCADE_VOCABULARY/.test(error.message),
+      );
+    });
+  });
+
   describe("given a record whose commit is not a commit", () => {
     it("refuses it, naming the record", async () => {
       const folder = await root("malformed");
@@ -134,6 +179,53 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
           `${commits.newer.slice(0, 12)}, the head of its default branch`,
         ),
       );
+    });
+
+    it("records the commit it read, as a package build does", async () => {
+      const folder = await root("head-recorded");
+      const found = await resolveVocabulary(folder, repository);
+      const out = join(folder, "out");
+      await recordVocabulary(out, found);
+      assert.deepEqual(
+        JSON.parse(await readFile(join(out, "vocabulary.json"), "utf8")),
+        {
+          repository,
+          commit: commits.newer,
+          how: "the head of its default branch",
+        },
+      );
+    });
+
+    it("records nothing for a vocabulary it was named or found beside it", async () => {
+      const out = join(scratch, "out-named");
+      await recordVocabulary(out, { folder: "x", said: "x" });
+      assert.equal(existsSync(join(out, "vocabulary.json")), false);
+    });
+
+    it("uses the cached vocabulary offline, saying which commit and that it could not look for a newer one", async () => {
+      const folder = await root("offline");
+      await resolveVocabulary(folder, repository);
+      const found = await resolveVocabulary(
+        folder,
+        "http://127.0.0.1:1/cascade-vocabulary.git",
+      );
+      assert.equal(await readFile(join(found.folder, TERMS), "utf8"), "newer");
+      assert.match(found.said, new RegExp(commits.newer.slice(0, 12)));
+      assert.match(found.said, /could not check for a newer one/);
+      assert.equal(found.recorded?.commit, commits.newer);
+      assert.match(found.recorded?.how ?? "", /could not check/);
+    });
+
+    it("fetches from a root as long as one deep in a project's node_modules on Windows", {
+      skip: process.platform !== "win32" && "the path limit is Windows'",
+    }, async () => {
+      let folder = join(scratch, "long");
+      while (folder.length < 105)
+        folder = join(folder, "node_modules_of_a_deep_project");
+      folder = join(folder, "cascade-reference-tables");
+      await mkdir(folder, { recursive: true });
+      const found = await resolveVocabulary(folder, repository);
+      assert.equal(await readFile(join(found.folder, TERMS), "utf8"), "newer");
     });
 
     it("says to check the vocabulary out beside it when its repository cannot be read", async () => {

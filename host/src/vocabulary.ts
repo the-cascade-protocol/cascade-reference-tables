@@ -33,7 +33,13 @@ export interface Recorded {
 export interface Resolved {
   readonly folder: string;
   readonly said: string;
+  readonly recorded?: Recorded;
 }
+
+export async function recordVocabulary(
+  _out: string,
+  _resolved: Resolved,
+): Promise<void> {}
 
 async function git(folder: string, ...args: string[]): Promise<string> {
   return (await run("git", ["-C", folder, ...args])).stdout.trim();
