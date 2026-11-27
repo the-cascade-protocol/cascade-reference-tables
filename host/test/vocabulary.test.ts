@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -87,6 +94,19 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
       const found = await resolveVocabulary(folder, repository);
       assert.equal(await readFile(join(found.folder, TERMS), "utf8"), "older");
       assert.match(found.said, new RegExp(commits.older.slice(0, 12)));
+    });
+
+    it("refuses a commit its repository lacks, leaving nothing in .cache/", async () => {
+      const folder = await root("lacking");
+      await writeFile(
+        join(folder, "vocabulary.json"),
+        JSON.stringify({ repository, commit: "0".repeat(40) }),
+      );
+      await assert.rejects(resolveVocabulary(folder, repository));
+      assert.deepEqual(
+        await readdir(join(folder, ".cache", "cascade-vocabulary")),
+        [],
+      );
     });
   });
 
