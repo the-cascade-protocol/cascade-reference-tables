@@ -1,6 +1,15 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
@@ -36,13 +45,11 @@ export interface Resolved {
   readonly recorded?: Recorded;
 }
 
-export async function recordVocabulary(
-  _out: string,
-  _resolved: Resolved,
-): Promise<void> {}
-
+/** `.cache/` can sit past Windows' path limit, which git honours only when told. */
 async function git(folder: string, ...args: string[]): Promise<string> {
-  return (await run("git", ["-C", folder, ...args])).stdout.trim();
+  return (
+    await run("git", ["-C", folder, "-c", "core.longpaths=true", ...args])
+  ).stdout.trim();
 }
 
 /**
@@ -73,29 +80,83 @@ export async function resolveVocabulary(
       !/^[0-9a-f]{40}$/.test(String(recorded.commit))
     )
       throw new Error(`${record} names no repository and commit`);
+    if (recorded.repository !== repository)
+      throw new Error(
+        `${record} names ${recorded.repository}, not ${repository}; refusing to fetch from it`,
+      );
+    const how = recorded.how === undefined ? "" : ` (${recorded.how})`;
+    const folder = await fetched(root, repository, recorded.commit).catch(
+      (error: unknown) => {
+        throw new Error(
+          `${record} names commit ${recorded.commit} of ${repository}${how}, which could not be fetched; ` +
+            `check the vocabulary out beside this repository as ${SIBLING}, or name it by $CASCADE_VOCABULARY`,
+          { cause: error },
+        );
+      },
+    );
     return {
-      folder: await fetched(root, recorded.repository, recorded.commit),
-      said: `cascade-vocabulary: ${recorded.commit.slice(0, 12)}, which this build was tested with${recorded.how === undefined ? "" : ` (${recorded.how})`}`,
+      folder,
+      said: `cascade-vocabulary: ${recorded.commit.slice(0, 12)} of ${repository}, which this build was tested with${how}`,
+      recorded,
     };
   }
   const beside = `check it out beside this repository as ${SIBLING} to read it with no network`;
-  const head = (
-    await run("git", ["ls-remote", repository, "HEAD"]).catch(
-      (error: unknown) => {
-        throw new Error(`${repository} could not be read; ${beside}`, {
-          cause: error,
-        });
-      },
-    )
-  ).stdout
-    .trim()
-    .split(/\s/)[0];
+  const listed = await run("git", ["ls-remote", repository, "HEAD"]).catch(
+    (error: unknown) => error as Error,
+  );
+  if (listed instanceof Error) {
+    const cached = await newestCached(root);
+    if (cached === undefined)
+      throw new Error(`${repository} could not be read; ${beside}`, {
+        cause: listed,
+      });
+    const how = "the newest it had fetched; could not check for a newer one";
+    return {
+      folder: cached.folder,
+      said: `cascade-vocabulary: ${cached.commit.slice(0, 12)} of ${repository}, ${how}`,
+      recorded: { repository, commit: cached.commit, how },
+    };
+  }
+  const head = listed.stdout.trim().split(/\s/)[0];
   if (head === undefined || head === "")
     throw new Error(`${repository} has no default branch; ${beside}`);
+  const how = "the head of its default branch";
   return {
     folder: await fetched(root, repository, head),
-    said: `cascade-vocabulary: ${head.slice(0, 12)}, the head of its default branch; ${beside}`,
+    said: `cascade-vocabulary: ${head.slice(0, 12)} of ${repository}, ${how}; ${beside}`,
+    recorded: { repository, commit: head, how },
   };
+}
+
+/** The most recently fetched vocabulary in `.cache/`, for a run that cannot reach the repository. */
+async function newestCached(
+  root: string,
+): Promise<{ folder: string; commit: string } | undefined> {
+  const cache = join(root, ".cache", "cascade-vocabulary");
+  if (!existsSync(cache)) return undefined;
+  const found: { folder: string; commit: string; at: number }[] = [];
+  for (const entry of await readdir(cache)) {
+    const folder = join(cache, entry);
+    if (/^[0-9a-f]{40}$/.test(entry) && existsSync(join(folder, TERMS)))
+      found.push({ folder, commit: entry, at: (await stat(folder)).mtimeMs });
+  }
+  return found.sort((a, b) => b.at - a.at)[0];
+}
+
+/**
+ * Writes what a local run read of the vocabulary, as a package build's `vocabulary.json` does, beside what the run
+ * builds; nothing when the vocabulary was named or checked out beside, which have no commit to say.
+ */
+export async function recordVocabulary(
+  out: string,
+  resolved: { readonly recorded?: Recorded },
+): Promise<void> {
+  if (resolved.recorded === undefined) return;
+  await mkdir(out, { recursive: true });
+  await writeFile(
+    join(out, "vocabulary.json"),
+    `${JSON.stringify(resolved.recorded, null, 2)}\n`,
+  );
 }
 
 /** The vocabulary's files at a commit, fetched once into `.cache/`. */
@@ -123,8 +184,6 @@ async function fetched(
         partial,
         "-c",
         "advice.detachedHead=false",
-        "-c",
-        "core.longpaths=true",
         "checkout",
         "--quiet",
         "FETCH_HEAD",

@@ -149,7 +149,7 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
         (error: Error) =>
           error.message.includes("0".repeat(40)) &&
           error.message.includes("pull request 7 merged into main") &&
-          /beside it/.test(error.message) &&
+          /beside this repository/.test(error.message) &&
           /CASCADE_VOCABULARY/.test(error.message),
       );
     });
@@ -176,7 +176,7 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
       assert.match(
         found.said,
         new RegExp(
-          `${commits.newer.slice(0, 12)}, the head of its default branch`,
+          `${commits.newer.slice(0, 12)} of .*, the head of its default branch`,
         ),
       );
     });
@@ -198,7 +198,7 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
 
     it("records nothing for a vocabulary it was named or found beside it", async () => {
       const out = join(scratch, "out-named");
-      await recordVocabulary(out, { folder: "x", said: "x" });
+      await recordVocabulary(out, {});
       assert.equal(existsSync(join(out, "vocabulary.json")), false);
     });
 
@@ -216,17 +216,27 @@ describe("Finding the vocabulary · host/src/vocabulary.ts", () => {
       assert.match(found.recorded?.how ?? "", /could not check/);
     });
 
-    it("fetches from a root as long as one deep in a project's node_modules on Windows", {
-      skip: process.platform !== "win32" && "the path limit is Windows'",
-    }, async () => {
-      let folder = join(scratch, "long");
-      while (folder.length < 105)
-        folder = join(folder, "node_modules_of_a_deep_project");
-      folder = join(folder, "cascade-reference-tables");
-      await mkdir(folder, { recursive: true });
-      const found = await resolveVocabulary(folder, repository);
-      assert.equal(await readFile(join(found.folder, TERMS), "utf8"), "newer");
-    });
+    it(
+      "fetches from a root as long as one deep in a project's node_modules on Windows",
+      {
+        skip: process.platform !== "win32" && "the path limit is Windows'",
+      },
+      async () => {
+        const base = join(scratch, "long", "cascade-reference-tables");
+        const folder = join(
+          scratch,
+          "long",
+          "d".repeat(Math.max(1, 105 - base.length)),
+          "cascade-reference-tables",
+        );
+        await mkdir(folder, { recursive: true });
+        const found = await resolveVocabulary(folder, repository);
+        assert.equal(
+          await readFile(join(found.folder, TERMS), "utf8"),
+          "newer",
+        );
+      },
+    );
 
     it("says to check the vocabulary out beside it when its repository cannot be read", async () => {
       await assert.rejects(
