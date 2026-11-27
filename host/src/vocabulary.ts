@@ -102,16 +102,31 @@ async function fetched(
   if (!existsSync(join(folder, TERMS))) {
     await mkdir(dirname(folder), { recursive: true });
     const partial = await mkdtemp(`${folder}.partial-`);
-    await git(partial, "init", "--quiet");
-    await git(partial, "fetch", "--quiet", "--depth", "1", repository, commit);
-    await git(
-      partial,
-      "-c",
-      "advice.detachedHead=false",
-      "checkout",
-      "--quiet",
-      "FETCH_HEAD",
-    );
+    try {
+      await git(partial, "init", "--quiet");
+      await git(
+        partial,
+        "fetch",
+        "--quiet",
+        "--depth",
+        "1",
+        repository,
+        commit,
+      );
+      await git(
+        partial,
+        "-c",
+        "advice.detachedHead=false",
+        "-c",
+        "core.longpaths=true",
+        "checkout",
+        "--quiet",
+        "FETCH_HEAD",
+      );
+    } catch (error) {
+      await rm(partial, { recursive: true, force: true });
+      throw error;
+    }
     // Another run fetching the same commit may have put it in place first.
     await rename(partial, folder).catch(async (error: unknown) => {
       if (!existsSync(join(folder, TERMS))) throw error;
