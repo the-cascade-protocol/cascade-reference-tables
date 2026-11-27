@@ -24,17 +24,12 @@ jobs:
         with:
           path: cascade-reference-tables
           persist-credentials: false
-      - name: The vocabulary at the commit vocabulary.json pins, beside this repository
+      - name: The vocabulary at its newest main, or the pull request a Depends-On line names, beside this repository
         id: vocabulary
-        run: |
-          echo "repository=$(jq -r '.repository | sub("^https://github.com/"; "")' vocabulary.json)" >> "$GITHUB_OUTPUT"
-          echo "commit=$(jq -r .commit vocabulary.json)" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v7
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
         with:
-          repository: ${{ steps.vocabulary.outputs.repository }}
-          ref: ${{ steps.vocabulary.outputs.commit }}
-          path: cascade-vocabulary
-          persist-credentials: false
+          repository: the-cascade-protocol/cascade-vocabulary
+          checkout: cascade-vocabulary
       - name: The runtime's report writer, beside this repository
         uses: actions/checkout@v7
         with:
