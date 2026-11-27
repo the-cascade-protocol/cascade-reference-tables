@@ -10,6 +10,8 @@ jobs:
   files:
     runs-on: ubuntu-latest
     steps:
+      - name: the job's Python before the picker
+        run: command -v python3 | tee "${RUNNER_TEMP}/python-before"
       - name: the vocabulary, in place of the commit vocabulary.json pins
         id: vocabulary
         uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
@@ -30,6 +32,8 @@ jobs:
           set -euo pipefail
           echo "vocabulary: ${VOCABULARY}"
           echo "runtime: ${RUNTIME}"
+          echo "python3 after the picker: $(command -v python3)"
+          test "$(command -v python3)" = "$(cat "${RUNNER_TEMP}/python-before")"
           test -f cascade-vocabulary/ontologies/cascade.ttl
           git -C cascade-vocabulary log --oneline -3
           git -C cascade-runtime-js log --oneline -3
