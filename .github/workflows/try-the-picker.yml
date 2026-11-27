@@ -12,13 +12,13 @@ jobs:
     steps:
       - name: the vocabulary, in place of the commit vocabulary.json pins
         id: vocabulary
-        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
         with:
           repository: the-cascade-protocol/cascade-vocabulary
           checkout: cascade-vocabulary
       - name: the runtime's files
         id: runtime
-        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
         with:
           repository: the-cascade-protocol/cascade-runtime-js
           checkout: cascade-runtime-js
@@ -39,19 +39,19 @@ jobs:
     steps:
       - name: the runtime's package
         id: runtime
-        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
         with:
           repository: the-cascade-protocol/cascade-runtime-js
           package: cascade-runtime-*.tgz
       - name: the sandbox's package
         id: sandbox
-        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
         with:
           repository: the-cascade-protocol/cascade-sandbox
           package: '*.tgz'
       - name: the tables' package
         id: tables
-        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@main
+        uses: the-cascade-protocol/cascade-bridge-spec/.github/actions/pick@feat/a-picker-for-installed-packages-and-read-files
         with:
           repository: the-cascade-protocol/cascade-reference-tables
           package: cascade-reference-tables-*.tgz
